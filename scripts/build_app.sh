@@ -10,6 +10,11 @@ DMG_STAGING="${DIST_DIR}/dmg_staging"
 DMG_PATH="${DIST_DIR}/${APP_NAME}-v${VERSION}.dmg"
 CODESIGN_ID="${CODESIGN_IDENTITY:--}"
 
+if [ ! -f "Resources/AppIcon.icns" ]; then
+    echo "🎨 [0/4] 正在生成 macOS 应用图标 (Resources/AppIcon.icns)..."
+    swift scripts/generate_icon.swift
+fi
+
 echo "🔨 [1/4] 正在编译 Release 版本 (支持 Apple Silicon + Intel 通用二进制)..."
 if swift build -c release --arch arm64 --arch x86_64 2>/dev/null; then
     BIN_PATH=".build/apple/Products/Release/${APP_NAME}"
@@ -28,6 +33,10 @@ mkdir -p "${BUILD_DIR}/Contents/Resources"
 cp "${BIN_PATH}" "${BUILD_DIR}/Contents/MacOS/${APP_NAME}"
 chmod +x "${BUILD_DIR}/Contents/MacOS/${APP_NAME}"
 
+if [ -f "Resources/AppIcon.icns" ]; then
+    cp "Resources/AppIcon.icns" "${BUILD_DIR}/Contents/Resources/AppIcon.icns"
+fi
+
 cat > "${BUILD_DIR}/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -41,6 +50,10 @@ cat > "${BUILD_DIR}/Contents/Info.plist" <<EOF
     <string>${APP_NAME}</string>
     <key>CFBundleDisplayName</key>
     <string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -66,6 +79,9 @@ echo "💿 [4/4] 正在生成 DMG 拖拽安装镜像 (${DMG_PATH})..."
 rm -rf "${DMG_STAGING}" "${DMG_PATH}"
 mkdir -p "${DMG_STAGING}"
 cp -R "${BUILD_DIR}" "${DMG_STAGING}/"
+if [ -f "Resources/AppIcon.icns" ]; then
+    cp "Resources/AppIcon.icns" "${DMG_STAGING}/.VolumeIcon.icns"
+fi
 ln -s /Applications "${DMG_STAGING}/Applications"
 hdiutil create -volname "${APP_NAME}" -srcfolder "${DMG_STAGING}" -ov -format UDZO "${DMG_PATH}" >/dev/null
 rm -rf "${DMG_STAGING}"
